@@ -14,25 +14,17 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4">
-
-    <!-- Global Message Box -->
     <div id="message-box" class="fixed top-4 right-4 z-50 transition-opacity duration-300 opacity-0 pointer-events-none">
-        <!-- Messages appear here -->
     </div>
-
-    <!-- Main Application Container -->
     <div id="app-container" class="max-w-6xl mx-auto shadow-xl rounded-2xl bg-white flex h-[90vh] overflow-hidden">
         
-        <!-- Mail Application View (no auth now) -->
         <div id="view-mail-app" class="w-full flex">
 
-            <!-- Sidebar Navigation -->
             <div class="w-1/4 bg-gray-800 p-6 flex flex-col justify-between">
                 <div>
                     <h1 class="text-3xl font-bold text-yellow-400 mb-4">TempMail</h1>
                     <p class="text-sm text-gray-400 mb-1">Your Temporary Email:</p>
                     <div class="bg-gray-700 text-white p-2 rounded-lg text-sm font-mono truncate mb-3" id="current-user-display">
-                        <!-- Disposable email populated here -->
                     </div>
                     <button onclick="generateNewMailbox()" class="w-full mb-6 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-400 transition">
                         Generate New Address
@@ -65,10 +57,8 @@
                 </div>
             </div>
 
-            <!-- Main Content Area -->
             <div class="w-3/4 p-8 overflow-y-auto">
                 
-                <!-- Compose View -->
                 <div id="view-compose" class="view-content" style="display: none;">
                     <h2 class="text-3xl font-semibold text-gray-800 mb-6 border-b pb-2">New Message</h2>
                     <div class="space-y-4">
@@ -84,7 +74,6 @@
                     </div>
                 </div>
 
-                <!-- Inbox View -->
                 <div id="view-inbox" class="view-content">
                     <h2 class="text-3xl font-semibold text-gray-800 mb-6 border-b pb-2">Inbox</h2>
                     <div id="mail-list" class="mail-list space-y-2 h-[calc(90vh-10rem)] overflow-y-auto pr-2">
@@ -92,7 +81,6 @@
                     </div>
                 </div>
 
-                <!-- Read Mail View -->
                 <div id="view-read" class="view-content" style="display: none;">
                     <button onclick="setView('inbox')" class="mb-4 text-yellow-600 hover:text-yellow-700 font-medium flex items-center">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -111,7 +99,6 @@
                     </button>
                 </div>
 
-                <!-- Reply View -->
                 <div id="view-reply" class="view-content" style="display: none;">
                     <h2 class="text-3xl font-semibold text-gray-800 mb-6 border-b pb-2">Reply Message</h2>
                     <div class="space-y-4">
@@ -136,9 +123,7 @@
 
     let mailData = []; 
     let currentMail = null; 
-    let currentUserEmail = '';  // disposable mailbox address
-
-    // ----------------- Utility: Toast -----------------
+    let currentUserEmail = '';  
     function showInfo(message, type = 'success') {
         const box = document.getElementById('message-box');
         let bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
@@ -161,21 +146,17 @@
         }, 3000);
     }
 
-    // ----------------- URL helpers -----------------
     function getMailboxFromURL() {
         const params = new URLSearchParams(window.location.search);
-        return params.get('mailbox'); // may be null
+        return params.get('mailbox');
     }
 
     function setMailboxInURL(email) {
         const params = new URLSearchParams(window.location.search);
         params.set('mailbox', email);
         const newUrl = window.location.pathname + '?' + params.toString();
-        // replaceState avoids adding history entries
         window.history.replaceState({}, '', newUrl);
     }
-
-    // ----------------- Disposable mailbox logic -----------------
 
     async function generateNewMailbox() {
         try {
@@ -188,7 +169,6 @@
             const result = await resp.json();
             currentUserEmail = result.email;
 
-            // ✅ persist via URL query param
             setMailboxInURL(currentUserEmail);
 
             document.getElementById('current-user-display').textContent = currentUserEmail;
@@ -200,8 +180,6 @@
         }
     }
 
-    // ----------------- View switching -----------------
-
     function setView(viewId) {
         document.querySelectorAll('.view-content').forEach(el => el.style.display = 'none');
         const targetView = document.getElementById(`view-${viewId}`);
@@ -212,8 +190,6 @@
             }
         }
     }
-
-    // ----------------- Inbox logic -----------------
 
     async function fetchInbox() {
         const list = document.getElementById('mail-list');
@@ -278,8 +254,6 @@
         });
     }
 
-    // ----------------- Read / Reply -----------------
-
     function readMail(mailId) {
         currentMail = mailData.find(m => m.id === mailId);
         if (!currentMail) return;
@@ -312,8 +286,6 @@
 
         setView('reply');
     }
-
-    // ----------------- Send -----------------
 
     async function sendMail(isReply = false) {
         const toField = isReply ? 'reply-to' : 'mail-to';
@@ -380,10 +352,7 @@
         }
     }
 
-    // ----------------- Init -----------------
-
     document.addEventListener('DOMContentLoaded', () => {
-        // 1. Try to read mailbox from URL
         const existing = getMailboxFromURL();
         if (existing) {
             currentUserEmail = existing;
@@ -391,7 +360,6 @@
             showInfo(`Using address from URL: ${currentUserEmail}`);
             setView('inbox');
         } else {
-            // 2. No mailbox in URL: create a new one
             generateNewMailbox();
         }
     });
