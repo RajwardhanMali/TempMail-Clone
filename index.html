@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-User SMTP Client</title>
+    <title>Disposable SMTP Client</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -23,63 +23,45 @@
     <!-- Main Application Container -->
     <div id="app-container" class="max-w-6xl mx-auto shadow-xl rounded-2xl bg-white flex h-[90vh] overflow-hidden">
         
-        <!-- Authentication View (Login/Register) -->
-        <div id="view-auth" class="w-full flex items-center justify-center p-8">
-            <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl border border-gray-100">
-                <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center" id="auth-title">Log In</h2>
-                
-                <input type="email" id="auth-email" placeholder="Email (e.g., user@mydomain.com)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
-                <input type="password" id="auth-password" placeholder="Password" class="w-full p-3 mb-6 border border-gray-300 rounded-lg focus:ring-yellow-500 focus:border-yellow-500">
-                
-                <button onclick="handleAuthSubmit()" id="auth-submit-btn" class="w-full py-3 bg-yellow-500 text-gray-900 font-semibold rounded-lg shadow-md hover:bg-yellow-400 transition">
-                    Log In
-                </button>
-                
-                <p class="text-center mt-4 text-sm">
-                    <span id="auth-toggle-text">Don't have an account?</span> 
-                    <button onclick="toggleAuthMode()" class="text-blue-600 hover:text-blue-800 font-medium">Register</button>
-                </p>
-                <p class="text-xs text-red-500 mt-4 text-center">
-                    *Note: Registration is restricted to the `@mydomain.com` domain by the proxy.
-                </p>
-            </div>
-        </div>
+        <!-- Mail Application View (no auth now) -->
+        <div id="view-mail-app" class="w-full flex">
 
-        <!-- Mail Application View -->
-        <div id="view-mail-app" class="w-full flex" style="display: none;">
-            
             <!-- Sidebar Navigation -->
             <div class="w-1/4 bg-gray-800 p-6 flex flex-col justify-between">
                 <div>
-                    <h1 class="text-3xl font-bold text-yellow-400 mb-8">TempMail</h1>
-                    
-                    <p class="text-sm text-gray-400 mb-2">Logged in as:</p>
-                    <div class="bg-gray-700 text-white p-2 rounded-lg text-sm font-mono truncate mb-6" id="current-user-display">
-                        <!-- User email populated here -->
+                    <h1 class="text-3xl font-bold text-yellow-400 mb-4">TempMail</h1>
+                    <p class="text-sm text-gray-400 mb-1">Your Temporary Email:</p>
+                    <div class="bg-gray-700 text-white p-2 rounded-lg text-sm font-mono truncate mb-3" id="current-user-display">
+                        <!-- Disposable email populated here -->
                     </div>
+                    <button onclick="generateNewMailbox()" class="w-full mb-6 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-400 transition">
+                        Generate New Address
+                    </button>
 
                     <button onclick="setView('compose')" 
                             class="w-full mb-4 px-4 py-3 bg-yellow-500 text-gray-900 font-semibold rounded-lg shadow-md hover:bg-yellow-400 transition">
                         <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
                         Compose Mail
                     </button>
+
                     <div class="space-y-2">
                         <button onclick="setView('inbox')" class="w-full text-left p-3 rounded-lg text-white font-medium bg-gray-700 hover:bg-gray-600 transition">
                             <svg class="w-5 h-5 inline-block mr-2 -mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
                             Inbox (<span id="inbox-count">0</span>)
                         </button>
-                        <button onclick="showInfo('Sent Mail requires tracking on the server, which is outside the scope of the basic SMTP implementation.')" class="w-full text-left p-3 rounded-lg text-gray-400 hover:bg-gray-700 transition">
+                        <button onclick="showInfo('Sent Mail tracking is not persisted; this client focuses on disposable inbox functionality.')" class="w-full text-left p-3 rounded-lg text-gray-400 hover:bg-gray-700 transition">
                             <svg class="w-5 h-5 inline-block mr-2 -mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.166 1.486l5-1.111a1 1 0 00.41-.954V9a1 1 0 012 0v6.764a1 1 0 00.41.954l5 1.11a1 1 0 001.166-1.486l-7-14z"></path></svg>
                             Sent Mail
                         </button>
                     </div>
                 </div>
-                <button onclick="logout()" class="w-full py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-500 transition">
-                    Log Out
-                </button>
+
                 <div class="text-xs text-gray-500 mt-4">
                     <p>C++ SMTP Project Client</p>
                     <p>API Proxy Port: 8000</p>
+                    <p class="mt-2 text-[11px] text-gray-400">
+                        This is a disposable email service. Anyone who knows your address can read the inbox until the server is reset or files are deleted.
+                    </p>
                 </div>
             </div>
 
@@ -129,7 +111,7 @@
                     </button>
                 </div>
 
-                <!-- Reply View (uses Compose template) -->
+                <!-- Reply View -->
                 <div id="view-reply" class="view-content" style="display: none;">
                     <h2 class="text-3xl font-semibold text-gray-800 mb-6 border-b pb-2">Reply Message</h2>
                     <div class="space-y-4">
@@ -150,311 +132,271 @@
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:8000/api';
-        let mailData = []; 
-        let currentMail = null; 
+    const API_BASE_URL = 'http://10.20.29.53:8000/api';
+
+    let mailData = []; 
+    let currentMail = null; 
+    let currentUserEmail = '';  // disposable mailbox address
+
+    // ----------------- Utility: Toast -----------------
+    function showInfo(message, type = 'success') {
+        const box = document.getElementById('message-box');
+        let bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
+        let icon = type === 'error'
+            ? 'M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
+            : 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+
+        box.innerHTML = `
+            <div class="px-4 py-3 rounded-lg shadow-xl text-white font-medium flex items-center ${bgColor}">
+                <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="${icon}" clip-rule="evenodd"></path></svg>
+                <span>${message}</span>
+            </div>
+        `;
+        box.classList.remove('opacity-0', 'pointer-events-none');
+        box.classList.add('opacity-100');
+
+        setTimeout(() => {
+            box.classList.remove('opacity-100');
+            box.classList.add('opacity-0', 'pointer-events-none');
+        }, 3000);
+    }
+
+    // ----------------- URL helpers -----------------
+    function getMailboxFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('mailbox'); // may be null
+    }
+
+    function setMailboxInURL(email) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('mailbox', email);
+        const newUrl = window.location.pathname + '?' + params.toString();
+        // replaceState avoids adding history entries
+        window.history.replaceState({}, '', newUrl);
+    }
+
+    // ----------------- Disposable mailbox logic -----------------
+
+    async function generateNewMailbox() {
+        try {
+            const resp = await fetch(`${API_BASE_URL}/new_mailbox`, {
+                method: 'POST'
+            });
+            if (!resp.ok) {
+                throw new Error(`HTTP ${resp.status}`);
+            }
+            const result = await resp.json();
+            currentUserEmail = result.email;
+
+            // ✅ persist via URL query param
+            setMailboxInURL(currentUserEmail);
+
+            document.getElementById('current-user-display').textContent = currentUserEmail;
+            showInfo(`New disposable address: ${currentUserEmail}`);
+            setView('inbox');
+        } catch (err) {
+            console.error('Error generating mailbox:', err);
+            showInfo('Failed to generate new mailbox. Is the API running?', 'error');
+        }
+    }
+
+    // ----------------- View switching -----------------
+
+    function setView(viewId) {
+        document.querySelectorAll('.view-content').forEach(el => el.style.display = 'none');
+        const targetView = document.getElementById(`view-${viewId}`);
+        if (targetView) {
+            targetView.style.display = 'block';
+            if (viewId === 'inbox') {
+                fetchInbox();
+            }
+        }
+    }
+
+    // ----------------- Inbox logic -----------------
+
+    async function fetchInbox() {
+        const list = document.getElementById('mail-list');
+        if (!currentUserEmail) {
+            list.innerHTML = `<div class="text-gray-500 py-12 text-center">No mailbox yet. Click "Generate New Address".</div>`;
+            document.getElementById('inbox-count').textContent = 0;
+            return;
+        }
+
+        list.innerHTML = `<div class="text-gray-500 py-12 text-center" id="loading-inbox">
+                            <svg class="animate-spin h-5 w-5 mr-3 inline-block text-yellow-500" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 100 16 8 8 0 01-8-8z"></path>
+                            </svg>
+                            Loading mail for ${currentUserEmail}...
+                          </div>`;
+        document.getElementById('inbox-count').textContent = '...';
         
-        let isAuthenticated = false;
-        let currentUserEmail = '';
-        let currentAuthToken = '';
-        let isRegisterMode = false;
+        try {
+            const response = await fetch(`${API_BASE_URL}/inbox/${encodeURIComponent(currentUserEmail)}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            mailData = await response.json();
+            renderInboxList(mailData);
 
-        /**
-         * Utility function to show a temporary message.
-         */
-        function showInfo(message, type = 'success') {
-            const box = document.getElementById('message-box');
-            let bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
-            let icon = type === 'error' ? 'M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z' : 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+        } catch (error) {
+            console.error("Failed to fetch inbox:", error);
+            showInfo(`Error loading inbox: ${error.message}. Check API proxy.`, 'error');
+            list.innerHTML = `<div class="text-red-500 py-12 text-center">Failed to load inbox.</div>`;
+            document.getElementById('inbox-count').textContent = 0;
+        }
+    }
 
-            box.innerHTML = `
-                <div class="px-4 py-3 rounded-lg shadow-xl text-white font-medium flex items-center ${bgColor}">
-                    <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="${icon}" clip-rule="evenodd"></path></svg>
-                    <span>${message}</span>
+    function renderInboxList(mails) {
+        const list = document.getElementById('mail-list');
+        list.innerHTML = '';
+        document.getElementById('inbox-count').textContent = mails.length;
+
+        if (mails.length === 0) {
+            list.innerHTML = `<div class="text-gray-500 py-12 text-center">Inbox is empty.</div>`;
+            return;
+        } 
+
+        mails.forEach(mail => {
+            const item = document.createElement('div');
+            item.className = 'flex items-center p-3 bg-white hover:bg-gray-100 rounded-lg shadow-sm cursor-pointer border border-gray-200';
+            item.onclick = () => readMail(mail.id);
+            
+            const datePart = mail.date
+                ? new Date(mail.date).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                : 'Unknown Date';
+
+            item.innerHTML = `
+                <div class="w-1/3 font-semibold text-gray-800 truncate">${mail.from}</div>
+                <div class="w-2/3 flex justify-between items-center ml-4">
+                    <span class="truncate text-gray-700">${mail.subject}</span>
+                    <span class="text-xs text-gray-500 min-w-max ml-4">${datePart}</span>
                 </div>
             `;
-            box.classList.remove('opacity-0', 'pointer-events-none');
-            box.classList.add('opacity-100');
-
-            setTimeout(() => {
-                box.classList.remove('opacity-100');
-                box.classList.add('opacity-0', 'pointer-events-none');
-            }, 3000);
-        }
-        
-        // --- Authentication Logic ---
-
-        function toggleAuthMode() {
-            isRegisterMode = !isRegisterMode;
-            document.getElementById('auth-title').textContent = isRegisterMode ? 'Register New Account' : 'Log In';
-            document.getElementById('auth-submit-btn').textContent = isRegisterMode ? 'Register' : 'Log In';
-            document.getElementById('auth-toggle-text').textContent = isRegisterMode ? 'Already have an account?' : "Don't have an account?";
-        }
-
-        async function handleAuthSubmit() {
-            const email = document.getElementById('auth-email').value.trim();
-            const password = document.getElementById('auth-password').value.trim();
-            const endpoint = isRegisterMode ? 'register' : 'login';
-
-            if (!email || !password) {
-                showInfo('Please enter both email and password.', 'error');
-                return;
-            }
-            
-            document.getElementById('auth-submit-btn').disabled = true;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    showInfo(result.message);
-                    if (!isRegisterMode) {
-                        // Successful Login
-                        currentUserEmail = result.email;
-                        currentAuthToken = result.token;
-                        isAuthenticated = true;
-                        initializeMailApp();
-                    } else {
-                        // Successful Registration, switch to login
-                        toggleAuthMode();
-                    }
-                } else {
-                    showInfo(`Auth Error: ${result.message}`, 'error');
-                }
-            } catch (error) {
-                showInfo('Connection failed. Is Python Proxy running on port 8000?', 'error');
-                console.error("Auth API Error:", error);
-            } finally {
-                document.getElementById('auth-submit-btn').disabled = false;
-            }
-        }
-
-        function initializeMailApp() {
-            document.getElementById('view-auth').style.display = 'none';
-            document.getElementById('view-mail-app').style.display = 'flex';
-            document.getElementById('current-user-display').textContent = currentUserEmail;
-            setView('inbox');
-        }
-
-        function logout() {
-            // Conceptually, you would invalidate the token on the server here.
-            isAuthenticated = false;
-            currentUserEmail = '';
-            currentAuthToken = '';
-            mailData = [];
-            
-            document.getElementById('view-auth').style.display = 'flex';
-            document.getElementById('view-mail-app').style.display = 'none';
-            showInfo('Logged out successfully.');
-        }
-
-        // --- Mail App Logic ---
-
-        /**
-         * Switches the active view.
-         */
-        function setView(viewId) {
-            if (!isAuthenticated && viewId !== 'auth') {
-                logout();
-                return;
-            }
-            document.querySelectorAll('.view-content').forEach(el => el.style.display = 'none');
-            const targetView = document.getElementById(`view-${viewId}`);
-            if (targetView) {
-                targetView.style.display = 'block';
-                if (viewId === 'inbox') {
-                    fetchInbox();
-                }
-            }
-        }
-        
-        /**
-         * Fetches mail from the API proxy for the logged-in user.
-         */
-        async function fetchInbox() {
-            const list = document.getElementById('mail-list');
-            list.innerHTML = `<div class="text-gray-500 py-12 text-center" id="loading-inbox">
-                                <svg class="animate-spin h-5 w-5 mr-3 inline-block text-yellow-500" viewBox="0 0 24 24">...</svg>
-                                Loading mail for ${currentUserEmail}...
-                              </div>`;
-            document.getElementById('inbox-count').textContent = '...';
-            
-            try {
-                // Pass the logged-in user's email to the inbox endpoint
-                const response = await fetch(`${API_BASE_URL}/inbox/${currentUserEmail}`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                mailData = await response.json();
-                renderInboxList(mailData);
-
-            } catch (error) {
-                console.error("Failed to fetch inbox:", error);
-                showInfo(`Error loading inbox: ${error.message}. Check API proxy.`, 'error');
-                list.innerHTML = `<div class="text-red-500 py-12 text-center">Failed to load inbox.</div>`;
-                document.getElementById('inbox-count').textContent = 0;
-            }
-        }
-
-        /**
-         * Renders the list of mail items in the Inbox view.
-         */
-        function renderInboxList(mails) {
-            // ... (Render logic remains the same)
-            const list = document.getElementById('mail-list');
-            list.innerHTML = '';
-            document.getElementById('inbox-count').textContent = mails.length;
-
-            if (mails.length === 0) {
-                list.innerHTML = `<div class="text-gray-500 py-12 text-center">Inbox is empty.</div>`;
-                return;
-            } 
-
-            mails.forEach(mail => {
-
-                console.log(mail);
-                const item = document.createElement('div');
-                item.className = 'flex items-center p-3 bg-white hover:bg-gray-100 rounded-lg shadow-sm cursor-pointer border border-gray-200';
-                item.onclick = () => readMail(mail.id);
-                
-                const datePart = mail.date ? new Date(mail.date).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Unknown Date';
-
-                item.innerHTML = `
-                    <div class="w-1/3 font-semibold text-gray-800 truncate">${mail.from}</div>
-                    <div class="w-2/3 flex justify-between items-center ml-4">
-                        <span class="truncate text-gray-700">${mail.subject}</span>
-                        <span class="text-xs text-gray-500 min-w-max ml-4">${datePart}</span>
-                    </div>
-                `;
-                list.appendChild(item);
-            });
-        }
-
-
-        /**
-         * Displays the content of a selected mail item.
-         */
-        function readMail(mailId) {
-            currentMail = mailData.find(m => m.id === mailId);
-            if (!currentMail) return;
-
-            document.getElementById('read-subject').textContent = currentMail.subject;
-            document.getElementById('read-from').textContent = currentMail.from;
-            document.getElementById('read-date').textContent = currentMail.date ? new Date(currentMail.date).toLocaleString() : 'N/A';
-            document.getElementById('read-body').textContent = currentMail.body;
-
-            setView('read');
-        }
-
-        /**
-         * Prepares the Reply view based on the current mail.
-         */
-        function setReplyView() {
-            if (!currentMail) {
-                showInfo('Please select a mail to reply to first.', 'error');
-                return;
-            }
-            
-            // Logic to extract clean email address from "Name <email@domain.com>" format
-            const fromField = currentMail.from;
-            const match = fromField.match(/<([^>]+)>/);
-            const cleanRecipient = match ? match[1] : fromField;
-
-            document.getElementById('reply-to').value = cleanRecipient;
-            
-            const originalSubject = currentMail.subject.startsWith('Re: ') ? currentMail.subject : `Re: ${currentMail.subject}`;
-            document.getElementById('reply-subject').value = originalSubject;
-            
-            const quote = `\n\n---\nOriginal message from ${currentMail.from} on ${currentMail.date}:\n${currentMail.body.split('\n').map(line => `> ${line}`).join('\n')}`;
-            document.getElementById('reply-body').value = "\n\n" + quote;
-
-            setView('reply');
-        }
-
-        /**
-         * Sends the composed or replied mail via the API proxy.
-         */
-        async function sendMail(isReply = false) {
-            const toField = isReply ? 'reply-to' : 'mail-to';
-            const subjectField = isReply ? 'reply-subject' : 'mail-subject';
-            const bodyField = isReply ? 'reply-body' : 'mail-body';
-
-            const recipient = document.getElementById(toField).value.trim();
-            const subject = document.getElementById(subjectField).value.trim();
-            const body = document.getElementById(bodyField).value.trim();
-            const sender = currentUserEmail; 
-
-            if (!isAuthenticated) {
-                showInfo('You must be logged in to send mail.', 'error');
-                logout();
-                return;
-            }
-
-            if (!recipient || !subject || !body) {
-                showInfo('All fields must be filled out to send mail.', 'error');
-                return;
-            }
-            
-            const btn = document.getElementById('send-btn');
-            const loading = document.getElementById('send-loading');
-            
-            btn.disabled = true;
-            loading.classList.remove('hidden');
-
-            const mailPayload = {
-                token: currentAuthToken, // Pass the token for server-side verification
-                rcpt_to: recipient,
-                subject: subject,
-                body: body,
-            };
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/send`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(mailPayload)
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    showInfo(`Mail successfully sent to ${recipient}.`);
-                    
-                    if (isReply) {
-                        setView('read'); 
-                    } else {
-                        document.getElementById('mail-to').value = '';
-                        document.getElementById('mail-subject').value = '';
-                        document.getElementById('mail-body').value = '';
-                        setView('inbox');
-                    }
-                } else {
-                    showInfo(`Failed to send mail: ${result.message}`, 'error');
-                    if (response.status === 401) logout();
-                }
-            } catch (error) {
-                console.error("API Send Error:", error);
-                showInfo(`Connection failed. Is Python Proxy running? Error: ${error.message}`, 'error');
-            } finally {
-                btn.disabled = false;
-                loading.classList.add('hidden');
-            }
-        }
-
-        // Initialize the app (start on the authentication view)
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('view-auth').style.display = 'flex';
-            document.getElementById('view-mail-app').style.display = 'none';
+            list.appendChild(item);
         });
+    }
 
+    // ----------------- Read / Reply -----------------
+
+    function readMail(mailId) {
+        currentMail = mailData.find(m => m.id === mailId);
+        if (!currentMail) return;
+
+        document.getElementById('read-subject').textContent = currentMail.subject;
+        document.getElementById('read-from').textContent = currentMail.from;
+        document.getElementById('read-date').textContent = currentMail.date ? new Date(currentMail.date).toLocaleString() : 'N/A';
+        document.getElementById('read-body').textContent = currentMail.body;
+
+        setView('read');
+    }
+
+    function setReplyView() {
+        if (!currentMail) {
+            showInfo('Please select a mail to reply to first.', 'error');
+            return;
+        }
+        
+        const fromField = currentMail.from;
+        const match = fromField.match(/<([^>]+)>/);
+        const cleanRecipient = match ? match[1] : fromField;
+
+        document.getElementById('reply-to').value = cleanRecipient;
+        
+        const originalSubject = currentMail.subject.startsWith('Re: ') ? currentMail.subject : `Re: ${currentMail.subject}`;
+        document.getElementById('reply-subject').value = originalSubject;
+        
+        const quote = `\n\n---\nOriginal message from ${currentMail.from} on ${currentMail.date}:\n${currentMail.body.split('\n').map(line => `> ${line}`).join('\n')}`;
+        document.getElementById('reply-body').value = "\n\n" + quote;
+
+        setView('reply');
+    }
+
+    // ----------------- Send -----------------
+
+    async function sendMail(isReply = false) {
+        const toField = isReply ? 'reply-to' : 'mail-to';
+        const subjectField = isReply ? 'reply-subject' : 'mail-subject';
+        const bodyField = isReply ? 'reply-body' : 'mail-body';
+
+        const recipient = document.getElementById(toField).value.trim();
+        const subject = document.getElementById(subjectField).value.trim();
+        const body = document.getElementById(bodyField).value.trim();
+        const sender = currentUserEmail;
+
+        if (!currentUserEmail) {
+            showInfo('No disposable address yet. Generate one first.', 'error');
+            return;
+        }
+
+        if (!recipient || !subject || !body) {
+            showInfo('All fields must be filled out to send mail.', 'error');
+            return;
+        }
+        
+        const btn = document.getElementById('send-btn');
+        const loading = document.getElementById('send-loading');
+        
+        btn.disabled = true;
+        loading.classList.remove('hidden');
+
+        const mailPayload = {
+            from: sender,
+            rcpt_to: recipient,
+            subject: subject,
+            body: body,
+        };
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(mailPayload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showInfo(`Mail successfully sent to ${recipient}.`);
+                
+                if (isReply) {
+                    setView('read'); 
+                } else {
+                    document.getElementById('mail-to').value = '';
+                    document.getElementById('mail-subject').value = '';
+                    document.getElementById('mail-body').value = '';
+                    setView('inbox');
+                }
+            } else {
+                showInfo(`Failed to send mail: ${result.message}`, 'error');
+            }
+        } catch (error) {
+            console.error("API Send Error:", error);
+            showInfo(`Connection failed. Is Python Proxy running? Error: ${error.message}`, 'error');
+        } finally {
+            btn.disabled = false;
+            loading.classList.add('hidden');
+        }
+    }
+
+    // ----------------- Init -----------------
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1. Try to read mailbox from URL
+        const existing = getMailboxFromURL();
+        if (existing) {
+            currentUserEmail = existing;
+            document.getElementById('current-user-display').textContent = currentUserEmail;
+            showInfo(`Using address from URL: ${currentUserEmail}`);
+            setView('inbox');
+        } else {
+            // 2. No mailbox in URL: create a new one
+            generateNewMailbox();
+        }
+    });
     </script>
+
+
 </body>
 </html>

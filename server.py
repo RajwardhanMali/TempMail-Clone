@@ -1,71 +1,56 @@
 # server.py
 # Requires: pip install flask flask-cors
-# Assumes: C++ SMTP server running on 127.0.0.1:2525
-#          and saving .eml files into the MAIL_SPOOL_DIR directory.
+#
+# This is a disposable email service API that talks to a toy SMTP server
+# implemented in C++ on 127.0.0.1:2525. It:
+#   - Creates random disposable email addresses
+#   - Sends mail via SMTP to the C++ server
+#   - Reads .eml files from a spool directory and exposes them as JSON
 
 import os
 import glob
 import socket
 import uuid
-from datetime import datetime
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 from email.message import EmailMessage
-from email.utils import formataddr, formatdate, make_msgid
+from email.utils import formatdate, make_msgid
 from email import policy
 from email.parser import BytesParser
 
-# --- Configuration (Must match C++ Server) ---
-SMTP_SERVER_HOST = '127.0.0.1'
+# --- Configuration (must match C++ SMTP server & spool path) ---
+SMTP_SERVER_HOST = "127.0.0.1"
 SMTP_SERVER_PORT = 2525
-MAIL_SPOOL_DIR = 'mail_spool'
-APP_DOMAIN = 'mydomain.com'
+MAIL_SPOOL_DIR = "mail_spool"
+APP_DOMAIN = "mydomain.com"
 
 app = Flask(__name__)
 CORS(app)
 
-# --- Conceptual USER DATABASE (in-memory only) ---
-# Stores: { user_email: { "id": uuid, "password": "HASH_xxx" } }
-users = {}
-# Stores: { session_token: user_email }
-sessions = {}
 
-
-# ========== Utility Auth Functions ==========
-
-def conceptual_hash(password: str) -> str:
-    """Very fake hash. Replace with bcrypt/argon2 in real app."""
-    return f"HASH_{password}_SALT"
-
-
-def conceptual_verify(email: str, password: str) -> bool:
-    if email in users and users[email]['password'] == conceptual_hash(password):
-        return True
-    return False
-
-
-def generate_session_token(email: str) -> str:
-    token = str(uuid.uuid4())
-    sessions[token] = email
-    return token
-
-
-def get_user_from_token(token: str):
-    return sessions.get(token)
-
-
-# ========== SMTP Client Logic ==========
+# =====================================================================
+#                    SMTP CLIENT: PYTHON → C++ SERVER
+# =====================================================================
 
 def send_smtp_message(mail_from: str, rcpt_to_list, raw_message: str) -> bool:
     """
-    Connects to the C++ SMTP server and executes the full protocol sequence.
-    Sends raw_message as the DATA block (RFC 5322 email).
+    Connect to the C++ SMTP server and send a complete RFC 5322 message.
+    Executes:
+        220 Greeting
+        EHLO
+        MAIL FROM
+        RCPT TO (for each recipient)
+        DATA + message
+        .
+        QUIT
     """
     s = None
     try:
-        s = socket.create_connection((SMTP_SERVER_HOST, SMTP_SERVER_PORT), timeout=5)
+        s = socket.create_connection(
+            (SMTP_SERVER_HOST, SMTP_SERVER_PORT), timeout=5
+        )
 
         def read_response() -> str:
             data = b""
@@ -74,23 +59,23 @@ def send_smtp_message(mail_from: str, rcpt_to_list, raw_message: str) -> bool:
                 if not chunk:
                     break
                 data += chunk
-                if data.endswith(b'\r\n'):
+                if data.endswith(b"\r\n"):
                     break
-            return data.decode('utf-8', errors='ignore').strip()
+            return data.decode("utf-8", errors="ignore").strip()
 
         def send_command(cmd: str, expected_code: int) -> str:
-            s.sendall(f"{cmd}\r\n".encode('utf-8'))
+            s.sendall(f"{cmd}\r\n".encode("utf-8"))
             response = read_response()
             print(f"C: {cmd} | S: {response}")
             if not response.startswith(str(expected_code)):
                 raise Exception(f"SMTP Error (expected {expected_code}): {response}")
             return response
 
-        # 1. Initial greeting
+        # 1. Greeting
         greeting = read_response()
         print(f"S: {greeting}")
-        if not greeting.startswith('220'):
-            raise Exception("Did not receive 220 initial greeting.")
+        if not greeting.startswith("220"):
+            raise Exception("Did not receive 220 initial greeting")
 
         # 2. EHLO
         send_command(f"EHLO {APP_DOMAIN}", 250)
@@ -98,7 +83,7 @@ def send_smtp_message(mail_from: str, rcpt_to_list, raw_message: str) -> bool:
         # 3. MAIL FROM
         send_command(f"MAIL FROM:<{mail_from}>", 250)
 
-        # 4. RCPT TO (multiple allowed)
+        # 4. RCPT TO
         for rcpt in rcpt_to_list:
             send_command(f"RCPT TO:<{rcpt}>", 250)
 
@@ -106,21 +91,21 @@ def send_smtp_message(mail_from: str, rcpt_to_list, raw_message: str) -> bool:
         send_command("DATA", 354)
 
         # Normalize line endings to CRLF
-        data_to_send = raw_message.replace('\r\n', '\n').replace('\n', '\r\n')
+        data_to_send = raw_message.replace("\r\n", "\n").replace("\n", "\r\n")
 
-        # Dot-stuffing: any line that begins with "." gets another "."
+        # Dot-stuffing (RFC 5321): lines beginning with "." are prefixed with another "."
         stuffed_lines = []
-        for line in data_to_send.split('\r\n'):
-            if line.startswith('.'):
-                stuffed_lines.append('.' + line)
+        for line in data_to_send.split("\r\n"):
+            if line.startswith("."):
+                stuffed_lines.append("." + line)
             else:
                 stuffed_lines.append(line)
-        stuffed_data = '\r\n'.join(stuffed_lines) + '\r\n'
+        stuffed_data = "\r\n".join(stuffed_lines) + "\r\n"
 
         # Send DATA block
-        s.sendall(stuffed_data.encode('utf-8'))
+        s.sendall(stuffed_data.encode("utf-8"))
 
-        # Terminate DATA with "."
+        # End of DATA
         send_command(".", 250)
 
         # QUIT
@@ -136,104 +121,101 @@ def send_smtp_message(mail_from: str, rcpt_to_list, raw_message: str) -> bool:
             s.close()
 
 
-# ========== AUTH ENDPOINTS ==========
+# =====================================================================
+#                   DISPOSABLE EMAIL API ENDPOINTS
+# =====================================================================
 
-@app.route('/api/register', methods=['POST'])
-def handle_register():
-    data = request.json or {}
-    email = data.get('email')
-    password = data.get('password')
-
-    if not email or not password:
-        return jsonify({"status": "error", "message": "Email and password are required"}), 400
-
-    if not email.endswith(f"@{APP_DOMAIN}"):
-        return jsonify({
-            "status": "error",
-            "message": f"Registration only allowed for @{APP_DOMAIN} domain"
-        }), 403
-
-    if email in users:
-        return jsonify({"status": "error", "message": "User already exists"}), 409
-
-    users[email] = {
-        "id": str(uuid.uuid4()),
-        "password": conceptual_hash(password)
-    }
-
-    print(f"[AUTH] Registered user: {email}")
-    return jsonify({"status": "success", "message": "Registration successful"}), 201
+@app.route("/api/new_mailbox", methods=["POST"])
+def handle_new_mailbox():
+    """
+    Create a new disposable email address.
+    No auth, no password. Just a random alias under APP_DOMAIN.
+    Returns:
+        { "email": "abcd1234@mydomain.com" }
+    """
+    alias = uuid.uuid4().hex[:8]  # 8-char random mailbox
+    email = f"{alias}@{APP_DOMAIN}"
+    return jsonify({"email": email}), 200
 
 
-@app.route('/api/login', methods=['POST'])
-def handle_login():
-    data = request.json or {}
-    email = data.get('email')
-    password = data.get('password')
-
-    if not email or not password:
-        return jsonify({"status": "error", "message": "Email and password are required"}), 400
-
-    if conceptual_verify(email, password):
-        token = generate_session_token(email)
-        print(f"[AUTH] User logged in: {email}")
-        return jsonify({"status": "success", "token": token, "email": email}), 200
-
-    return jsonify({"status": "error", "message": "Invalid credentials"}), 401
-
-
-# ========== MAIL ENDPOINTS ==========
-
-@app.route('/api/send', methods=['POST'])
+@app.route("/api/send", methods=["POST"])
 def handle_send_mail():
     """
-    Send a new email. JSON body:
+    Send an email through the C++ SMTP server.
+
+    Expected JSON:
     {
-        "token": "<session_token>",
-        "rcpt_to": "bob@mydomain.com",
+        "from": "sender@example.com",
+        "rcpt_to": "xyz123@mydomain.com",
         "subject": "Hello",
-        "body": "Test body"
+        "body": "Message body..."
     }
+
+    No authentication (disposable service).
     """
     data = request.json or {}
-    token = data.get('token')
-    sender = get_user_from_token(token)
-    recipient = data.get('rcpt_to')
-    subject = data.get('subject')
-    body = data.get('body')
+    sender = data.get("from")
+    recipient = data.get("rcpt_to")
+    subject = data.get("subject")
+    body = data.get("body")
 
-    if not sender:
-        return jsonify({"status": "error", "message": "Authentication required"}), 401
+    if not sender or not recipient or not subject or not body:
+        return (
+            jsonify(
+                {"status": "error", "message": "from, rcpt_to, subject, body are required"}
+            ),
+            400,
+        )
 
-    if not recipient or not subject or not body:
-        return jsonify({"status": "error", "message": "Missing fields"}), 400
+    # OPTIONAL restriction: only allow local disposable recipients
+    # if not recipient.endswith(f"@{APP_DOMAIN}"):
+    #     return jsonify({"status": "error",
+    #                     "message": f"Recipient must be under @{APP_DOMAIN}"}), 400
 
-    # Build RFC 5322 email using EmailMessage
+    # Build a proper RFC 5322 email
     msg = EmailMessage()
-    msg['From'] = sender
-    msg['To'] = recipient
-    msg['Subject'] = subject
-    msg['Date'] = formatdate(localtime=True)
-    msg['Message-ID'] = make_msgid(domain=APP_DOMAIN)
-    msg['MIME-Version'] = '1.0'
-    msg.set_content(body)  # text/plain; utf-8 by default with modern policy
+    msg["From"] = sender  # only address, no display name
+    msg["To"] = recipient
+    msg["Subject"] = subject
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=APP_DOMAIN)
+    msg["MIME-Version"] = "1.0"
+    msg.set_content(body)  # text/plain; charset="utf-8"
 
     raw_message = msg.as_string()
 
     success = send_smtp_message(sender, [recipient], raw_message)
 
     if success:
-        return jsonify({"status": "success", "message": "Email queued for delivery"}), 200
+        return (
+            jsonify({"status": "success", "message": "Email queued for delivery"}),
+            200,
+        )
     else:
-        return jsonify({"status": "error", "message": "SMTP server connection failed or protocol error"}), 500
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "SMTP server connection failed or protocol error",
+                }
+            ),
+            500,
+        )
 
 
-from email import policy
-from email.parser import BytesParser
-
-@app.route('/api/inbox/<user_address>', methods=['GET'])
+@app.route("/api/inbox/<user_address>", methods=["GET"])
 def handle_get_inbox(user_address):
-    clean_address = user_address.replace('@', '_').replace('<', '_').replace('>', '_')
+    """
+    Return all messages for a given email address as JSON.
+
+    URL example:
+        GET /api/inbox/abcd1234@mydomain.com
+    """
+    # sanitize for filename pattern
+    clean_address = (
+        user_address.replace("@", "_").replace("<", "_").replace(">", "_")
+    )
+
     search_pattern = f"*{clean_address}*.eml"
     inbox_files = glob.glob(os.path.join(MAIL_SPOOL_DIR, search_pattern))
 
@@ -241,37 +223,47 @@ def handle_get_inbox(user_address):
 
     for filename in inbox_files:
         try:
-            with open(filename, 'rb') as f:
+            with open(filename, "rb") as f:
                 raw = f.read()
 
-            # 🔥 Important: strip any leading blank lines
-            raw = raw.lstrip(b'\r\n')
+            # be tolerant to any accidental leading blank lines
+            raw = raw.lstrip(b"\r\n")
 
             msg = BytesParser(policy=policy.default).parsebytes(raw)
 
+            # Extract text/plain body
             if msg.is_multipart():
-                part = msg.get_body(preferencelist=('plain',))
-                body_content = part.get_content() if part else ''
+                part = msg.get_body(preferencelist=("plain",))
+                body_content = part.get_content() if part else ""
             else:
                 body_content = msg.get_content()
 
-            messages.append({
-                "id": os.path.basename(filename),
-                "from": msg.get('From', 'Unknown Sender'),
-                "subject": msg.get('Subject', 'No Subject'),
-                "date": msg.get('Date', 'Unknown Date'),
-                "body": (body_content or '').strip()
-            })
+            messages.append(
+                {
+                    "id": os.path.basename(filename),
+                    "from": msg.get("From", "Unknown Sender"),
+                    "subject": msg.get("Subject", "No Subject"),
+                    "date": msg.get("Date", "Unknown Date"),
+                    "body": (body_content or "").strip(),
+                }
+            )
         except Exception as e:
             print(f"[INBOX] Error reading/parsing file {filename}: {e}")
 
     return jsonify(messages), 200
 
 
-if __name__ == '__main__':
-    # Ensure spool directory exists (C++ server should use the same path)
+# =====================================================================
+#                              MAIN
+# =====================================================================
+
+if __name__ == "__main__":
+    # Make sure the spool directory exists
     if not os.path.exists(MAIL_SPOOL_DIR):
         os.makedirs(MAIL_SPOOL_DIR)
 
-    print(f"API Proxy starting. Target SMTP: {SMTP_SERVER_HOST}:{SMTP_SERVER_PORT}")
-    app.run(host='127.0.0.1', port=8000, debug=True)
+    print(
+        f"Disposable Email API starting. "
+        f"Target SMTP: {SMTP_SERVER_HOST}:{SMTP_SERVER_PORT}"
+    )
+    app.run(host="127.0.0.1", port=8000, debug=True)
